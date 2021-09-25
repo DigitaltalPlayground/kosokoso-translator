@@ -1,0 +1,385 @@
+<!DOCTYPE HTML>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <title>こそこそ翻訳</title>
+    <meta name="X-UA-Compatible" content="IE=Edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="author" content="mtripg6666tdr">
+    <meta name="description" content="日本語とこそこそ語の相互変換をすることができます">
+    <meta name="keywords" content="翻訳,ツール,こそこそ,こそこそ語,Digitaltal Playground">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:site" content="@mtripg6666tdr">
+    <meta name="twitter:creator" content="@mtripg6666tdr">
+    <meta name="og:title" content="こそこそ翻訳">
+    <meta name="og:description" content="日本語とこそこそ語の相互変換をすることができます">
+    <link rel="stylesheet" href="/lib/materialize.min.css">
+    <title>こそこそ翻訳</title>
+    <style type="text/css">
+    nav div.nav-wrapper span.brand-logo {
+      margin-left: 20px;
+    }
+    div.main_container {
+      width: 100%;
+      padding-top: 40px;
+    }
+    div.main_container div.main {
+      width: 80%;
+      margin: 1vh auto;
+    }
+    div.select-wrapper span {
+      color: black;
+    }
+    </style>
+    <script type="text/javascript">
+    // グローバル変数
+    var fromElem, toElem, originalElem, resultElem, toLabel;
+    // ユーティリティ
+    function TextToByteArray(text){
+      if(typeof text !== "string") throw new Error("Received param is not a string!");
+      const result = [];
+      if (text == null)
+        return result;
+      for (var i = 0; i < text.length; i++) {
+        const c = text.charCodeAt(i);
+        if (c <= 0x7f) {
+          result.push(c);
+        } else if (c <= 0x07ff) {
+          result.push(((c >> 6) & 0x1F) | 0xC0);
+          result.push((c & 0x3F) | 0x80);
+        } else {
+          result.push(((c >> 12) & 0x0F) | 0xE0);
+          result.push(((c >> 6) & 0x3F) | 0x80);
+          result.push((c & 0x3F) | 0x80);
+        }
+      }
+      return result;
+    }
+    function ByteArrayToText(arr) {
+      if(!Array.isArray(arr)) throw new Error("Received param is not an array!");
+      if (arr == null)
+        return null;
+      let result = "";
+      let i;
+      while (i = arr.shift()) {
+        if (i <= 0x7f) {
+          result += String.fromCharCode(i);
+        } else if (i <= 0xdf) {
+          let c = ((i&0x1f)<<6);
+          c += arr.shift()&0x3f;
+          result += String.fromCharCode(c);
+        } else if (i <= 0xe0) {
+          let c = ((arr.shift()&0x1f)<<6)|0x0800;
+          c += arr.shift()&0x3f;
+          result += String.fromCharCode(c);
+        } else {
+          let c = ((i&0x0f)<<12);
+          c += (arr.shift()&0x3f)<<6;
+          c += arr.shift() & 0x3f;
+          result += String.fromCharCode(c);
+        }
+      }
+      return result;
+    }
+
+    function _eget(id){
+      return document.getElementById(id);
+    }
+
+    // !!!
+    // 共通中間データ = Common Intermediate Data = CID
+    // !!!
+
+    // テキストからCIDに変換
+    function convertTextToCID(value){
+      if(typeof value !== "string") throw new Error("Received param is not a string!");
+      return value.split("").map(function(char){
+        switch(char){
+          case "？": return "？";
+          case "！": return "！";
+          case "?": return "?";
+          case "!": return "!";
+          case "、": return "、";
+          case "。": return "。";
+          case ",": return ",";
+          case ".": return ".";
+          default: return TextToByteArray(char).map(function(byte){
+            return (256 + byte).toString(2).substr(1)
+          }).join("");
+        }
+      });
+    }
+    // こそこそ語(可逆)をCIDに変換
+    function convertKoso1ToCID(value){
+      if(typeof value !== "string") throw new Error("Received param is not a string!");
+      const raw = value.split('')
+      let result = [];
+      let current = [];
+      for(let i = 0; i < raw.length; i++){
+        switch(raw[i]){
+          case "こ":
+            current.push("0");
+            break;
+          case "そ":
+            current.push("1");
+            break;
+          case "？":
+          case "！":
+          case "?":
+          case "!":
+          case "、": 
+          case "。": 
+          case ",": 
+          case ".":
+            if(current.length > 0){
+              result.push(current.join(""));
+              current = [];
+            }
+            result.push(raw[i]);
+            break;
+          default: throw new Error("Invalid character");
+        }
+      }
+      if(current.length > 0)
+        result.push(current.join(""));
+      return result;
+    }
+    // CIDからテキストに変換
+    function convertCIDToText(value){
+      if(!Array.isArray(value)) throw new Error("Received param is not an array!");
+      const result = [];
+      for(let i = 0; i < value.length; i++){
+        switch(value[i]){
+          case "？":
+          case "！":
+          case "?":
+          case "!":
+          case "、": 
+          case "。": 
+          case ",": 
+          case ".":
+            result.push(value[i]);
+            break;
+          default:
+            if(value[i].length % 8 === 0){
+              const chunkLen = value[i].length / 8;
+              const bytes = [];
+              for(let j = 0; j < chunkLen; j++){
+                bytes.push(parseInt([...Array(8)].map(function(_, k){
+                  return value[i][j * 8 + k]
+                }).join(""), 2));
+              }
+              result.push(ByteArrayToText(bytes));
+            }
+            break;
+        }
+      }
+      return result.join("");
+    }
+    // CIDからこそこそ語(可逆)に変換
+    function convertCIDToKoso1(value){
+      if(!Array.isArray(value)) throw new Error("Received param is not an array!");
+      const result = [];
+      for(let i = 0; i < value.length; i++){
+        switch(value[i]){
+          case "？":
+          case "！":
+          case "?":
+          case "!":
+          case "、": 
+          case "。": 
+          case ",": 
+          case ".":
+            result.push(value[i]);
+            break;
+          default:
+            result.push(value[i].split("").map(function(char){
+              switch(char){
+                case "0": return "こ";
+                case "1": return "そ";
+              }
+            }).join(""));
+        }
+      }
+      return result.join("");
+    }
+    // CIDからこそこそ語(非可逆)に変換
+    function convertCIDToKoso2(value){
+      if(!Array.isArray(value)) throw new Error("Received param is not an array!");
+      const result = [];
+      for(let i = 0; i < value.length; i++){
+        switch(value[i]){
+          case "？":
+          case "！":
+          case "?":
+          case "!":
+          case "、": 
+          case "。": 
+          case ",": 
+          case ".":
+            result.push(value[i]);
+            break;
+          default:
+            console.log(value[i]);
+            result.push(value[i].split("").reduce(function(prev, current){
+              return Number(prev) + Number(current);
+            }) % 2 === 0 ? "こ" : "そ");
+        }
+      }
+      return result.join("");
+    }
+    // ビットをこそこそ語に変換 
+    function translate(){
+      let result = null;
+      if(fromElem.value === toElem.value){
+        result = "翻訳先を選択してください";
+      }else{
+        try{
+          const cid = 
+            fromElem.value === "ja" ? /*ja*/    convertTextToCID(originalElem.value) : 
+                                      /*koso1*/ convertKoso1ToCID(originalElem.value);
+          result = 
+            toElem.value === "ja" ?     /*ja*/    convertCIDToText(cid) : 
+            toElem.value === "koso1" ?  /*koso1*/ convertCIDToKoso1(cid) : 
+                                        /*koso2*/ convertCIDToKoso2(cid);
+        } catch(e){
+          console.error(e);
+          result = "変換できませんでした: " + e;
+        }
+      }
+      resultElem.value = result;
+      M.textareaAutoResize(resultElem);
+      toLabel.classList[result === "" ? "remove" : "add"]("active");
+    }
+    window.addEventListener("load", function(){
+      fromElem = _eget("s_from");
+      toElem = _eget("s_to");
+      originalElem = _eget("original_text");
+      resultElem = _eget("result_text");
+      toLabel = _eget("s_to_label");
+      [fromElem, toElem, originalElem].forEach(function(elem){
+        elem.addEventListener("change", translate);
+      });
+      originalElem.addEventListener("keyup", translate);
+      _eget("copy_btn").addEventListener("click", function(){
+        if(resultElem.value === ""){
+          M.toast({text: "まず翻訳をしてください", classes: "copied"});
+        }else{
+          resultElem.select();
+          document.execCommand("copy");
+          M.toast({text: "✅コピーしました", classes: "copied"});
+        }
+      });
+    });
+    ["resize", "load"].forEach(function(event){
+      window.addEventListener(event, function(){
+        if(window.innerWidth < 1000) {
+          [
+            _eget("col_left"),
+            _eget("col_right")
+          ].forEach(function(elem){
+            elem.classList.remove("s6");
+            elem.classList.add("s12");
+          });
+        }else{
+          [
+            _eget("col_left"),
+            _eget("col_right")
+          ].forEach(function(elem){
+            elem.classList.remove("s12");
+            elem.classList.add("s6");
+          });
+        }
+        if(window.innerWidth < 500){
+          [
+            _eget("s_from_container"),
+            _eget("s_to_container")
+          ].forEach(function(elem){
+            elem.classList.remove("s5");
+            elem.classList.add("s12");
+          });
+          const middle = _eget("s_middle");
+          middle.classList.remove("s2")
+          middle.classList.add("s12");
+          middle.children[0].textContent = "⇓";
+          _eget("s_container").style.height = "auto";
+          _eget("r_container").style.marginTop = "30px";
+        }else{
+          [
+            _eget("s_from_container"),
+            _eget("s_to_container")
+          ].forEach(function(elem){
+            elem.classList.remove("s12");
+            elem.classList.add("s5");
+          });
+          const middle = _eget("s_middle");
+          middle.classList.remove("s12")
+          middle.classList.add("s2");
+          middle.children[0].textContent = "⇒";
+          _eget("s_container").style.height = "60px";
+          _eget("r_container").style.marginTop = "80px";
+        }
+      });
+    });
+    document.addEventListener("DOMContentLoaded", function() {
+      M.FormSelect.init(document.querySelectorAll('select'), {});
+    });
+    </script>
+  </head>
+  <body>
+    <nav>
+      <div class="nav-wrapper blue darken-3">
+        <span class="brand-logo left">こそこそ翻訳</span>
+      </div>
+    </nav>
+    <div class="main_container">
+      <div class="main" style="min-height: 75vh;">
+        <div class="description">
+          <p>日本語とこそこそ語を相互翻訳します。</p>
+          <p>こそこそ語(可逆)は、日本語に変換できますが、結果が長くなります。こそこそ語(非可逆)は、入力された文章に対して不変の結果となりますが、日本語に戻すことはできません。</p>
+        </div>
+        <div class="form row">
+          <div class="col s6" id="col_left">
+            <form>
+              <div class="input_head row" id="s_container" style="height: 60px;">
+                <div class="input-field col s5" id="s_from_container">
+                  <select id="s_from">
+                    <option value="ja">日本語</option>
+                    <option value="koso1">こそこそ語(可逆)</option>
+                  </select>
+                  <label>翻訳元</label>
+                </div>
+                <div class="col s2" style="text-align: center;margin-top: 15px;" id="s_middle">
+                  <span style="line-height: 1.5;">⇒</span>
+                </div>
+                <div class="input-field col s5" id="s_to_container">
+                  <select id="s_to">
+                    <option value="ja">日本語</option>
+                    <option value="koso1" selected>こそこそ語(可逆)</option>
+                    <option value="koso2">こそこそ語(非可逆)</option>
+                  </select>
+                  <label>翻訳先</label>
+                </div>
+              </div>
+              <div class="input-field">
+                <textarea id="original_text" class="materialize-textarea"></textarea>
+                <label for="original_text">翻訳元</label>
+              </div>
+            </form>
+          </div>
+          <div class="col s6" id="col_right">
+            <div style="margin-top: 80px;" id="r_container">
+              <div class="input-field">
+                <textarea id="result_text" class="materialize-textarea"></textarea>
+                <label for="result_text" id="s_to_label" readonly>翻訳結果</label>
+              </div>
+            </div>
+            <button type="button" id="copy_btn" class="btn waves-effect waves-light blue darken-3">コピー</button>
+          </div>
+        </div>
+      </div>
+      <footer style="text-align: center;">Copyright &copy; 2016-2021 mtripg6666tdr All Rights Reserved.</footer>
+    </div>
+    <script type="text/javascript" src="/lib/materialize.min.js" defer></script>
+  </body>
+</html>
