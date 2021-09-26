@@ -88,6 +88,8 @@
 
     // !!!
     // 共通中間データ = Common Intermediate Data = CID
+    // データ様式は、配列。
+    // 翻訳元の文字列を通常文字と翻訳で置換されない特殊に分割した配列にし、通常文字を0と1の数値に変換したもの
     // !!!
 
     // テキストからCIDに変換
@@ -103,6 +105,8 @@
           case "。": return "。";
           case ",": return ",";
           case ".": return ".";
+          case "\r": return "\r";
+          case "\n": return "\n";
           default: return TextToByteArray(char).map(function(byte){
             return (256 + byte).toString(2).substr(1)
           }).join("");
@@ -131,6 +135,8 @@
           case "。": 
           case ",": 
           case ".":
+          case "\r":
+          case "\n":
             if(current.length > 0){
               result.push(current.join(""));
               current = [];
@@ -158,19 +164,22 @@
           case "。": 
           case ",": 
           case ".":
+          case "\r":
+          case "\n":
             result.push(value[i]);
             break;
           default:
-            if(value[i].length % 8 === 0){
-              const chunkLen = value[i].length / 8;
-              const bytes = [];
-              for(let j = 0; j < chunkLen; j++){
-                bytes.push(parseInt([...Array(8)].map(function(_, k){
-                  return value[i][j * 8 + k]
-                }).join(""), 2));
-              }
-              result.push(ByteArrayToText(bytes));
+            while(value[i].length % 8 !== 0){
+              value[i] = "0" + value[i];
             }
+            const chunkLen = value[i].length / 8;
+            const bytes = [];
+            for(let j = 0; j < chunkLen; j++){
+              bytes.push(parseInt([...Array(8)].map(function(_, k){
+                return value[i][j * 8 + k]
+              }).join(""), 2));
+            }
+            result.push(ByteArrayToText(bytes));
             break;
         }
       }
@@ -190,6 +199,8 @@
           case "。": 
           case ",": 
           case ".":
+          case "\r":
+          case "\n":
             result.push(value[i]);
             break;
           default:
@@ -217,6 +228,8 @@
           case "。": 
           case ",": 
           case ".":
+          case "\r":
+          case "\n":
             result.push(value[i]);
             break;
           default:
@@ -228,7 +241,7 @@
       }
       return result.join("");
     }
-    // ビットをこそこそ語に変換 
+    // 変換 
     function translate(){
       let result = null;
       if(fromElem.value === toElem.value){
@@ -370,8 +383,8 @@
           <div class="col s6" id="col_right">
             <div style="margin-top: 80px;" id="r_container">
               <div class="input-field">
-                <textarea id="result_text" class="materialize-textarea"></textarea>
-                <label for="result_text" id="s_to_label" readonly>翻訳結果</label>
+                <textarea id="result_text" class="materialize-textarea" readonly></textarea>
+                <label for="result_text" id="s_to_label">翻訳結果</label>
               </div>
             </div>
             <button type="button" id="copy_btn" class="btn waves-effect waves-light blue darken-3">コピー</button>
